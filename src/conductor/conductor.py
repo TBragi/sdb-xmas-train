@@ -1,5 +1,12 @@
-import os, threading, logging, sys, signal, time as timer, RPi.GPIO as GPIO
+import logging
+import os
+import signal
+import sys
+import threading
+import time as timer
 from datetime import datetime
+
+import RPi.GPIO as GPIO
 from omxplayer.player import OMXPlayer
 
 from musician import *
@@ -10,6 +17,7 @@ MOTOR_VR_PIN  = 12  # Motor speed
 MOTOR_EL_PIN  = 19  # Motor enable
 SSR_PIN       = 21  # Solid State Relay
 AUX           = 18  # AUX output
+REED_SENSOR   = 5
 
 
 
@@ -18,12 +26,18 @@ OPEN_HOUR = parse_time_from_string(get_env('OPEN_HOUR', '08:00:00'))
 CLOSE_HOUR = parse_time_from_string(get_env('CLOSE_HOUR', '20:00:00'))
 TRACKS_TO_PLAY = int(get_env('TRACKS_TO_PLAY', 2))
 BREAK_TIME = int(get_env('BREAK_TIME', 300))
+TRAINSPOTTING = bool(get_env('TIMEKEEPER', 1))
+TRAINSPOTTING_LIMIT = int(get_env('TIMEKEEPER_LIMIT', 40))
+TRAINSPOTTING_DISTANCE = int(get_env('TIMEKEEPER_DISTANCE', 3))
+TRAINSPOTTER = None
+
 
 ready_to_log = True
 ready_for_next_run = True
 has_running_show = False
 train_speed = 100
 train_break_time = 2
+latest_trainspotting = None
 
 
 
@@ -40,6 +54,9 @@ def setup():
   GPIO.output([MOTOR_EL_PIN, SSR_PIN], GPIO.LOW)
   MOTOR = GPIO.PWM(MOTOR_VR_PIN, 8000)
   MOTOR.start(0) # Is equal to zero speed
+  if TRAINSPOTTING:
+    GPIO.setup(REED_SENSOR, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    GPIO.add_event_detect(REED_SENSOR, GPIO.RISING, callback=trainspotter_trainspotting, bouncetime=500ms)
   
   print('Ready!')
 
@@ -118,6 +135,18 @@ def shop_is_open():
     """True if current clock is in the range [OPEN_HOUR, CLOSE_HOUR]"""
     global OPEN_HOUR, CLOSE_HOUR
     return OPEN_HOUR <= datetime.now().time() <= CLOSE_HOUR
+
+
+def trainspotter_trainspotting(channel):
+  global latest_trainspotting
+  if latest_trainspotting == None:
+    latest_trainspotting = datetime.now().time()
+    print(f"Train was spotted for the first time at {latest_trainspotting}")
+    return
+  prior_trainspotting = latest_trainspotting
+  latest_trainspotting = datetime.now().time()
+  print(f"Train was spotted! It was {latest_trainspotting - prior_trainspotting} ago it last was spotted")
+  return
 
 
 
