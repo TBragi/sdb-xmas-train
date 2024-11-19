@@ -106,8 +106,12 @@ def run_show_sequence():
         player.set_volume(0)
     if TRAINSPOTTING:
         stop_time = datetime.now().time()
+        stop_time_limit = stop_time + datetime.timedelta(seconds=TRAINSPOTTING_LIMIT)
         while stop_time > latest_trainspotting:
             timer.sleep(0.2)
+            if datetime.now.time() > stop_time_limit:
+                send_alert("Train is late")
+                break
 
         timer.sleep(TRAINSPOTTING_DISTANCE)
     # Disable train motor
@@ -154,6 +158,10 @@ def trainspotter_trainspotting(channel):
         f"Train was spotted! It was {latest_trainspotting - prior_trainspotting} ago it last was spotted"
     )
     return
+
+
+def send_alert(message):
+    print(f"ALERT: {message}")
 
 
 if __name__ == "__main__":
