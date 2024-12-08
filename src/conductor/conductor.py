@@ -7,7 +7,7 @@ import time as timer
 from datetime import datetime
 
 import RPi.GPIO as GPIO
-from omxplayer.player import OMXPlayer
+import vlc
 
 from musician import *
 from utils import *
@@ -87,9 +87,10 @@ def run_show_sequence():
     upbeat_track = get_upbeat_track()
     upbeat_track_path = os.path.join(get_vault_path(), upbeat_track)
     print(f"Now playing upbeat track {upbeat_track}")
-    player = OMXPlayer(upbeat_track_path)
-    player.set_volume(4)
-    timer.sleep(player.duration())
+    players = vlc.MediaPlayer(upbeat_track_path)
+    players.audio_set_volume(40)
+    players.play()
+    timer.sleep(players.get_length() / 1000)
 
     # Start train motor
     GPIO.output(MOTOR_EL_PIN, GPIO.HIGH)
@@ -100,20 +101,25 @@ def run_show_sequence():
         if not shop_is_open():
             break
         print(f"Now playing music track {track}")
-        player.load(os.path.join(get_vault_path(), track))
-        player.set_volume(2)
-        timer.sleep(player.duration())
-        player.set_volume(0)
-    if TRAINSPOTTING:
-        stop_time = datetime.now().time()
-        stop_time_limit = stop_time + datetime.timedelta(seconds=TRAINSPOTTING_LIMIT)
-        while stop_time > latest_trainspotting:
-            timer.sleep(0.2)
-            if datetime.now.time() > stop_time_limit:
-                send_alert("Train is late")
-                break
+        players.set_media(os.path.join(get_vault_path(), track))
+        players.audio_set_volume(20)
+        players.play()
+        timer.sleep(players.get_length() / 1000)
+        players.audio_set_volume(0)
 
-        timer.sleep(TRAINSPOTTING_DISTANCE)
+        if TRAINSPOTTING:
+            stop_time = datetime.now().time()
+            stop_time_limit = stop_time + datetime.timedelta(
+                seconds=TRAINSPOTTING_LIMIT
+            )
+            while stop_time > latest_trainspotting:
+                timer.sleep(0.2)
+                if datetime.now.time() > stop_time_limit:
+                    send_alert("Train is late")
+                    break
+
+            timer.sleep(TRAINSPOTTING_DISTANCE)
+
     # Disable train motor
     step_size = 1
     for dc in range(train_speed, 0, -step_size):
